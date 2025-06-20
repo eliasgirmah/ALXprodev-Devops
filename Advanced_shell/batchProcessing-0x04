@@ -1,54 +1,45 @@
 #!/bin/bash
 
-# Directory to store Pokémon data
 OUTPUT_DIR="pokemon_data"
 mkdir -p "$OUTPUT_DIR"
 
-# Error log file
-ERROR_LOG="errors_parallel.txt"
-> "$ERROR_LOG"  # Clear old errors
-
-# List of Pokémon to fetch
 POKEMON_LIST=("bulbasaur" "ivysaur" "venusaur" "charmander" "charmeleon")
 
-# Store PIDs
-declare -A POKEMON_PIDS
-
-# Function to fetch data
 fetch_pokemon() {
-    local name=$1
-    local output="$OUTPUT_DIR/${name}.json"
-    local retries=3
+  local name=$1
+  local retries=3
+  local count=0
+  local success=0
 
-    for attempt in $(seq 1 $retries); do
-        response=$(curl -s -w "%{http_code}" -o "$output" "https://pokeapi.co/api/v2/pokemon/$name")
-        http_code="${response:(-3)}"
+  while [[ $count -lt $retries ]]; do
+    echo "Fetching data for $name... (Attempt $((count + 1)))"
+    curl -s "https://pokeapi.co/api/v2/pokemon/$name" -o "$OUTPUT_DIR/$name.json"
+    # Check if output file contains valid JSON by checking for a '{' at start (basic check)
+    if [[ -s "$OUTPUT_DIR/$name.json" ]] && grep -q '{' "$OUTPUT_DIR/$name.json"; then
+      echo "Saved data to $OUTPUT_DIR/$name.json ✅"
+      success=1
+      break
+    else
+      echo "Failed to fetch data for $name. Retrying..."
+      ((count++))
+      sleep 2
+    fi
+  done
 
-        if [[ "$http_code" == "200" ]]; then
-            echo "✅ $name: saved to $output"
-            return 0
-        fi
-        echo "Attempt $attempt failed for $name"
-        sleep 1
-    done
-
-    echo "❌ $name: failed after $retries attempts" >> "$ERROR_LOG"
+  if [[ $success -eq 0 ]]; then
+    echo "Failed to fetch data for $name after $retries attempts." >> error.log
+  fi
 }
 
-# Launch background processes and collect PIDs
+# Start fetching all in background
 for pokemon in "${POKEMON_LIST[@]}"; do
-    fetch_pokemon "$pokemon" &
-    POKEMON_PIDS["$pokemon"]=$!
+  fetch_pokemon "$pokemon" &
 done
 
-# Wait and monitor all processes
-for pokemon in "${!POKEMON_PIDS[@]}"; do
-    pid=${POKEMON_PIDS[$pokemon]}
+echo "Active background jobs:"
+jobs
 
-    # Optional: timeout logic (e.g., kill if running more than 10 seconds)
-    ( sleep 10 && kill -0 "$pid" 2>/dev/null && echo "⚠️ Killing $pokemon ($pid) for timeout" && kill "$pid" ) &
-    
-    wait "$pid"
-done
+# Wait for all background jobs to complete
+wait
 
-echo "🔁 All background fetches completed."
+echo "All downloads completed."

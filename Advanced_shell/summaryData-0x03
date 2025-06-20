@@ -3,37 +3,41 @@
 # Output CSV file
 REPORT="pokemon_report.csv"
 
-# Header
+# Write CSV header
 echo "Name,Height (m),Weight (kg)" > "$REPORT"
 
-# Process each JSON file
-for file in pokemon_data/*.json; do
-  # Extract values
-  name=$(jq -r '.name' "$file" | awk '{print toupper(substr($0,1,1)) tolower(substr($0,2))}')
-  height=$(jq -r '.height' "$file")
-  weight=$(jq -r '.weight' "$file")
+# Directory containing JSON files (generated from Task 2)
+DATA_DIR="pokemon_data"
 
-  # Convert height to meters and weight to kg (API returns decimetres and hectograms)
-  height_m=$(awk "BEGIN {printf \"%.2f\", $height * 0.1}")
-  weight_kg=$(awk "BEGIN {printf \"%.2f\", $weight * 0.1}")
+# Loop through each JSON file
+for FILE in "$DATA_DIR"/*.json; do
+  NAME=$(jq -r '.name | ascii_upcase' "$FILE")
+  HEIGHT=$(jq -r '.height' "$FILE")
+  WEIGHT=$(jq -r '.weight' "$FILE")
 
+  # Convert height from decimeters to meters (divide by 10)
+  HEIGHT_M=$(awk "BEGIN {printf \"%.2f\", $HEIGHT / 10}")
+  
+  # Convert weight from hectograms to kilograms (divide by 10)
+  WEIGHT_KG=$(awk "BEGIN {printf \"%.2f\", $WEIGHT / 10}")
 
-echo -e "\nCSV Report generated at: $REPORT"
-  # Append to CSV
-  echo "$name,$height_m,$weight_kg" >> "$REPORT"
+  # Write to CSV
+  echo "$NAME,$HEIGHT_M,$WEIGHT_KG" >> "$REPORT"
 done
 
+# Print confirmation
+echo -e "\nCSV Report generated at: $REPORT"
+cat "$REPORT"
 
-
-# Compute averages using awk
+# Calculate average height and weight using awk
 awk -F, '
   NR > 1 {
-    height += $2
-    weight += $3
+    total_height += $2
+    total_weight += $3
     count++
   }
   END {
-    printf "\nAverage Height: %.2f m\n", height/count
-    printf "Average Weight: %.2f kg\n", weight/count
+    printf "\nAverage Height: %.2f m\n", total_height / count
+    printf "Average Weight: %.2f kg\n", total_weight / count
   }
 ' "$REPORT"

@@ -1,15 +1,12 @@
 #!/bin/bash
 
-# Directory to save JSON files
 DATA_DIR="pokemon_data"
 mkdir -p "$DATA_DIR"
 
-# List of Pokémon to fetch
 POKEMON_LIST=(Bulbasaur Ivysaur Venusaur Charmander Charmeleon)
 
-# Function to fetch Pokémon data with retries and error handling
 fetch_pokemon() {
-  local pokemon=$(echo "$1" | tr '[:upper:]' '[:lower:]')  # lowercase for API
+  local pokemon=$(echo "$1" | tr '[:upper:]' '[:lower:]')
   local url="https://pokeapi.co/api/v2/pokemon/$pokemon"
   local output_file="$DATA_DIR/${pokemon}.json"
   local max_retries=3
@@ -19,7 +16,6 @@ fetch_pokemon() {
   echo "Fetching data for $pokemon..."
 
   while [ $count -lt $max_retries ]; do
-    # Perform API request
     if curl -s "$url" -o "$output_file"; then
       echo "Saved data to $output_file ✅"
       success=1
@@ -36,15 +32,22 @@ fetch_pokemon() {
   fi
 }
 
-# Launch fetches in background for parallelism
+pids=()
+
+# Start fetches in background and store pids
 for pokemon in "${POKEMON_LIST[@]}"; do
   fetch_pokemon "$pokemon" &
+  pids+=($!)
 done
 
-# Show all background jobs
-jobs
+# Wait for background jobs with timeout and kill if needed
+for pid in "${pids[@]}"; do
+  # Wait up to 10 seconds for each process, then kill if still running
+  timeout 10 wait $pid
+  if kill -0 $pid 2>/dev/null; then
+    echo "Process $pid is taking too long, killing..."
+    kill $pid
+  fi
+done
 
-# Wait for all background jobs to finish
-wait
-
-echo "All Pokémon data fetched."
+echo "All Pokémon data fetched or failed."

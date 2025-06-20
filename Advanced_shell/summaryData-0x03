@@ -17,9 +17,13 @@ for file in pokemon_data/*.json; do
   height_m=$(awk "BEGIN {printf \"%.2f\", $height * 0.1}")
   weight_kg=$(awk "BEGIN {printf \"%.2f\", $weight * 0.1}")
 
+
+echo -e "\nCSV Report generated at: $REPORT"
   # Append to CSV
   echo "$name,$height_m,$weight_kg" >> "$REPORT"
 done
+
+
 
 # Compute averages using awk
 awk -F, '
